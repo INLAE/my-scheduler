@@ -1,0 +1,72 @@
+
+services:
+  # ------------------------------------------
+  # GATEWAY
+  # ------------------------------------------
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    # Пробрасываем порт 8080 на хост-машину
+    ports:
+      - "8080:8080"
+    # Зависит от domain-service и redis, 
+    # так что они поднимутся до gateway
+    depends_on:
+      - domain-service
+      - redis
+    # Переменные окружения (при необходимости)
+    # environment:
+    #   - SOME_VAR=some_value
+
+  # ------------------------------------------
+  # DOMAIN-SERVICE (CRUD-сервис)
+  # ------------------------------------------
+  domain-service:
+    build: ./domain-service
+    container_name: domain-service
+    # Пробрасываем порт 9090 (или любой другой)
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  # ------------------------------------------
+  # REDIS
+  # ------------------------------------------
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    # Если есть свой redis.conf, смонтируйте:
+    # volumes:
+    #   - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    # command: redis-server /usr/local/etc/redis/redis.conf
+
+  # ------------------------------------------
+  # RABBITMQ
+  # ------------------------------------------
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      # 5672 – основной порт RabbitMQ для сообщений
+      - "5672:5672"
+      # 15672 – порт Web-интерфейса (RabbitMQ Management)
+      - "15672:15672"
+
+  # ------------------------------------------
+  # MONGODB
+  # ------------------------------------------
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongodb/data:/data/db
+    environment:
+      # При желании можно задать root-пользователя
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
