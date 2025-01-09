@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'logstash'
+    static_configs:
+      - targets: ['logstash:9610']
+
+  - job_name: 'opensearch'
+    static_configs:
+      - targets: ['opensearch:9600']

@@ -1,0 +1,11 @@
+<configuration>
+    <appender name="LOGSTASH" class="ch.qos.logback.core.net.SocketAppender">
+        <remoteHost>localhost</remoteHost>
+        <port>5000</port>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder" />
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="LOGSTASH" />
+    </root>
+</configuration>

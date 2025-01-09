@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.example.gateway.grpc";
+option java_outer_classname = "ScheduleProto";
+
+message ScheduleRequest {
+  string id = 1;
+}
+
+message ScheduleResponse {
+  string id = 1;
+  string dayOfWeek = 2;
+  string startTime = 3;
+  string subject = 4;
+  string teacher = 5;
+}
+
+message ScheduleListRequest {
+}
+
+message ScheduleListResponse {
+  repeated ScheduleResponse schedules = 1;
+}
+
+message CreateScheduleRequest {
+  string dayOfWeek = 1;
+  string startTime = 2;
+  string subject = 3;
+  string teacher = 4;
+}
+
+message CreateScheduleResponse {
+  string id = 1;
+}
+
+message UpdateScheduleRequest {
+  string id = 1;
+  string dayOfWeek = 2;
+  string startTime = 3;
+  string subject = 4;
+  string teacher = 5;
+}
+
+message DeleteScheduleRequest {
+  string id = 1;
+}
+
+message DeleteScheduleResponse {
+  bool success = 1;
+}
+
+service ScheduleService {
+  rpc getAll (ScheduleListRequest) returns (ScheduleListResponse);
+  rpc getById (ScheduleRequest) returns (ScheduleResponse);
+  rpc create (CreateScheduleRequest) returns (CreateScheduleResponse);
+  rpc update (UpdateScheduleRequest) returns (ScheduleResponse);
+  rpc delete (DeleteScheduleRequest) returns (DeleteScheduleResponse);
+}

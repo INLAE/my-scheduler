@@ -1,64 +1,31 @@
+version: "3.8"
 
 services:
-  # ------------------------------------------
-  # GATEWAY
-  # ------------------------------------------
-  gateway:
-    build: ./gateway
-    container_name: gateway
-    # Пробрасываем порт 8080 на хост-машину
+  # -------------------------------
+  # RabbitMQ
+  # -------------------------------
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
     ports:
-      - "8080:8080"
-    # Зависит от domain-service и redis, 
-    # так что они поднимутся до gateway
-    depends_on:
-      - domain-service
-      - redis
-    # Переменные окружения (при необходимости)
-    # environment:
-    #   - SOME_VAR=some_value
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
 
-  # ------------------------------------------
-  # DOMAIN-SERVICE (CRUD-сервис)
-  # ------------------------------------------
-  domain-service:
-    build: ./domain-service
-    container_name: domain-service
-    # Пробрасываем порт 9090 (или любой другой)
-    ports:
-      - "9090:9090"
-    depends_on:
-      - mongodb
-      - rabbitmq
-
-  # ------------------------------------------
-  # REDIS
-  # ------------------------------------------
+  # -------------------------------
+  # Redis
+  # -------------------------------
   redis:
     image: redis:latest
     container_name: redis
     ports:
       - "6379:6379"
-    # Если есть свой redis.conf, смонтируйте:
-    # volumes:
-    #   - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
-    # command: redis-server /usr/local/etc/redis/redis.conf
 
-  # ------------------------------------------
-  # RABBITMQ
-  # ------------------------------------------
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      # 5672 – основной порт RabbitMQ для сообщений
-      - "5672:5672"
-      # 15672 – порт Web-интерфейса (RabbitMQ Management)
-      - "15672:15672"
-
-  # ------------------------------------------
-  # MONGODB
-  # ------------------------------------------
+  # -------------------------------
+  # MongoDB
+  # -------------------------------
   mongodb:
     image: mongo:latest
     container_name: mongodb
@@ -67,6 +34,111 @@ services:
     volumes:
       - ./mongodb/data:/data/db
     environment:
-      # При желании можно задать root-пользователя
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
+
+  # -------------------------------
+  # Domain Service
+  # -------------------------------
+  domain-service:
+    build: ./domain-service
+    container_name: domain-service
+    ports:
+      - "9091:9090" # Изменён внешний порт
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  # -------------------------------
+  # Gateway
+  # -------------------------------
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - domain-service
+      - redis
+
+  # -------------------------------
+  # OpenSearch
+  # -------------------------------
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Str0ng@Passw0rd2025
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.ssl.transport.enforce_hostname_verification=false
+    ports:
+      - "9200:9200" # API доступ OpenSearch
+      - "9700:9600" # Мониторинг OpenSearch
+    volumes:
+      - ./opensearch/data:/usr/share/opensearch/data
+    networks:
+      - monitoring
+
+  # -------------------------------
+  # Logstash
+  # -------------------------------
+  logstash:
+    image: opensearchproject/logstash-oss-with-opensearch-output-plugin:latest
+    container_name: logstash
+    depends_on:
+      - opensearch
+    ports:
+      - "5044:5044" # Filebeat logs
+      - "9610:9600" # Мониторинг Logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    command: logstash -f /usr/share/logstash/pipeline/logstash.conf
+    networks:
+      - monitoring
+
+  # -------------------------------
+  # Kibana
+  # -------------------------------
+  kibana:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: kibana
+    depends_on:
+      - opensearch
+    ports:
+      - "5601:5601" # Web-интерфейс Kibana
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+
+  # -------------------------------
+  # Prometheus
+  # -------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090" # Изменён внешний порт
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring
+
+  # -------------------------------
+  # Grafana
+  # -------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000" # Web-интерфейс Grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge

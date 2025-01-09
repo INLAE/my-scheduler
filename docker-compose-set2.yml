@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - domain-service
+
+  domain-service:
+    build: ./domain-service
+    container_name: domain-service
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongodb/data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Str0ng@Passw0rd2025
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.ssl.transport.enforce_hostname_verification=false
+    ports:
+      - "9200:9200" # API доступ OpenSearch
+      - "9700:9600" # Мониторинг OpenSearch
+    volumes:
+      - ./opensearch/data:/usr/share/opensearch/data
+
+  logstash:
+    image: opensearchproject/logstash-oss-with-opensearch-output-plugin:latest
+    container_name: logstash
+    depends_on:
+      - opensearch
+    ports:
+      - "5044:5044" # Filebeat logs
+      - "9610:9600" # Мониторинг Logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    command: logstash -f /usr/share/logstash/pipeline/logstash.conf
+
+  kibana:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: kibana
+    depends_on:
+      - opensearch
+    ports:
+      - "5601:5601" # Web-интерфейс Kibana
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
